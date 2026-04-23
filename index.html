@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Piano Trainer - Gammes et Accords</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 30px 20px; }
+    h1 { font-size: 1.8rem; margin-bottom: 4px; }
+    .subtitle { color: #888; margin-bottom: 28px; font-size: 0.9rem; }
+    .controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 28px; }
+    .controls label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 4px; }
+    select, button { padding: 8px 14px; border-radius: 6px; border: 1px solid #444; background: #16213e; color: #eee; font-size: 0.95rem; cursor: pointer; }
+    select { min-width: 120px; }
+    button { background: #2e75b6; border-color: #2e75b6; font-weight: 600; }
+    button:hover { background: #3d8fd0; }
+    .info-box { background: #16213e; border: 1px solid #2e75b6; border-radius: 8px; padding: 14px 22px; margin-bottom: 24px; text-align: center; min-width: 320px; }
+    .info-box .label { font-size: 0.8rem; color: #888; margin-bottom: 4px; }
+    .info-box .notes { font-size: 1.15rem; letter-spacing: 2px; color: #7ec8e3; font-weight: 600; }
+    .info-box .formula { font-size: 0.8rem; color: #666; margin-top: 4px; }
+    .keyboard-wrap { overflow-x: auto; width: 100%; display: flex; justify-content: center; }
+    .keyboard { position: relative; display: flex; user-select: none; margin-bottom: 10px; }
+    .white-key { width: 42px; height: 160px; background: #f5f5f5; border: 1px solid #aaa; border-radius: 0 0 5px 5px; position: relative; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; font-size: 0.7rem; color: #888; z-index: 1; }
+    .white-key.active { background: #7ec8e3; color: #fff; }
+    .white-key.root { background: #2e75b6; color: #fff; }
+    .black-key { width: 28px; height: 100px; background: #1a1a1a; border: 1px solid #333; border-radius: 0 0 4px 4px; position: absolute; top: 0; cursor: pointer; z-index: 2; }
+    .black-key.active { background: #2e75b6; }
+    .black-key.root { background: #1B3A6B; }
+    .legend { display: flex; gap: 18px; font-size: 0.8rem; color: #888; margin-top: 6px; }
+    .legend span { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .dot.root { background: #2e75b6; }
+    .dot.active { background: #7ec8e3; }
+  </style>
+</head>
+<body>
+<h1>Piano Trainer</h1>
+<p class="subtitle">Visualise les gammes et accords sur un clavier de piano</p>
+<div class="controls">
+  <div><label>Tonique</label><select id="rootSelect"></select></div>
+  <div><label>Gamme / Accord</label><select id="patternSelect"></select></div>
+  <div style="display:flex;align-items:flex-end;"><button id="randomBtn">Aleatoire</button></div>
+</div>
+<div class="info-box">
+  <div class="label">Notes</div>
+  <div class="notes" id="noteDisplay">-</div>
+  <div class="formula" id="formulaDisplay"></div>
+</div>
+<div class="keyboard-wrap"><div class="keyboard" id="keyboard"></div></div>
+<div class="legend">
+  <span><span class="dot root"></span> Tonique</span>
+  <span><span class="dot active"></span> Autre note</span>
+</div>
+<script>
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NL={'C':'Do','C#':'Do#','D':'Re','D#':'Re#','E':'Mi','F':'Fa','F#':'Fa#','G':'Sol','G#':'Sol#','A':'La','A#':'La#','B':'Si'};
+const PATTERNS={
+  'Majeure':{intervals:[0,2,4,5,7,9,11],formula:'T T d T T T d'},
+  'Mineure naturelle':{intervals:[0,2,3,5,7,8,10],formula:'T d T T d T T'},
+  'Mineure harmonique':{intervals:[0,2,3,5,7,8,11],formula:'T d T T d +d d'},
+  'Pentatonique M':{intervals:[0,2,4,7,9],formula:'T T +d T +d'},
+  'Pentatonique m':{intervals:[0,3,5,7,10],formula:'+d T T +d T'},
+  'Blues':{intervals:[0,3,5,6,7,10],formula:'+d T d d +d T'},
+  'Dorien':{intervals:[0,2,3,5,7,9,10],formula:'T d T T T d T'},
+  'Accord Majeur':{intervals:[0,4,7],formula:'2T  T+d'},
+  'Accord mineur':{intervals:[0,3,7],formula:'T+d  2T'},
+  'Accord dim.':{intervals:[0,3,6],formula:'T+d  T+d'},
+  'Accord aug.':{intervals:[0,4,8],formula:'2T  2T'},
+  'Accord 7Dom.':{intervals:[0,4,7,10],formula:'2T  T+d  2T'},
+  'Accord maj7':{intervals:[0,4,7,11],formula:'2T  T+d  2T+d'},
+  'Accord min7':{intervals:[0,3,7,10],formula:'T+d  2T  2T'},
+};
+const WN=['C','D','E','F','G','A','B','C','D','E','F','G','A','B'];
+const BP=[{n:'C#',w:0},{n:'D#',w:1},{n:'F#',w:3},{n:'G#',w:4},{n:'A#',w:5},{n:'C#',w:7},{n:'D#',w:8},{n:'F#',w:10},{n:'G#',w:11},{n:'A#',w:12}];
+const KW=42,BW=28;
+function buildKb(){
+  const kb=document.getElementById('keyboard');
+  kb.innerHTML='';kb.style.width=(KW*14)+'px';
+  WN.forEach(n=>{const k=document.createElement('div');k.className='white-key';k.dataset.note=n;k.textContent=NL[n];kb.appendChild(k);});
+  BP.forEach(b=>{const k=document.createElement('div');k.className='black-key';k.dataset.note=b.n;k.style.left=(b.w*KW+KW-BW/2)+'px';kb.appendChild(k);});
+}
+function highlight(){
+  const root=document.getElementById('rootSelect').value;
+  const pat=PATTERNS[document.getElementById('patternSelect').value];
+  if(!pat)return;
+  const ri=NOTES.indexOf(root);
+  const an=new Set(pat.intervals.map(i=>NOTES[(ri+i)%12]));
+  document.querySelectorAll('.white-key,.black-key').forEach(k=>{k.classList.remove('active','root');});
+  document.querySelectorAll('.white-key,.black-key').forEach(k=>{
+    if(k.dataset.note===root)k.classList.add('root');
+    else if(an.has(k.dataset.note))k.classList.add('active');
+  });
+  document.getElementById('noteDisplay').textContent=pat.intervals.map(i=>NL[NOTES[(ri+i)%12]]).join(' - ');
+  document.getElementById('formulaDisplay').textContent=pat.formula;
+}
+function init(){
+  const rs=document.getElementById('rootSelect');
+  NOTES.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=NL[n]+' ('+n+')';rs.appendChild(o);});
+  const ps=document.getElementById('patternSelect');
+  Object.keys(PATTERNS).forEach(name=>{const o=document.createElement('option');o.value=name;o.textContent=name;ps.appendChild(o);});
+  rs.addEventListener('change',highlight);ps.addEventListener('change',highlight);
+  document.getElementById('randomBtn').addEventListener('click',()=>{
+    rs.value=NOTES[Math.floor(Math.random()*NOTES.length)];
+    const k=Object.keys(PATTERNS);ps.value=k[Math.floor(Math.random()*k.length)];
+    highlight();
+  });
+  buildKb();highlight();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
